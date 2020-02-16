@@ -4,7 +4,7 @@
 ; Chơi trên web: http://minesweeperonline.com
 ; Zoom: 100%
 
-#Include "..\HandleImgSearch\HandleImgSearch.au3"
+#Include "HandleImgSearch.au3"
 
 HotKeySet("{Esc}", "_Exit")
 Func _Exit()
@@ -33,6 +33,13 @@ Global $Height = $BottomRight[1] - $TopLeft[1] - 3
 Global $NumberX = $Width/$SizeX
 Global $NumberY = $Height/$SizeY
 
+Global $CNum[9]
+Global $CB[2], $CD[2], $CF[2], $CN[2], $CW[2]
+;~ Global $CArray = [$C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $CB, $CD, $CF, $CN, $CW]
+
+; Load pixel vào mảng
+_LoadPixel()
+
 ; Khởi tạo chụp ảnh Global
 _GlobalImgInit("", $TopLeft[0] + 2, $TopLeft[1] + 2, $Width, $Height, False, False, 30, 1)
 
@@ -40,34 +47,34 @@ Global $Ar ; Mảng chứa toàn bộ thông tin bãi mìn
 Global $IsBeTac = False ; Khi nào bế tắc với cách giải thông thường thì trả về True
 Global $BeTacNum = 0 ; Số ô phân vân khi có bế tắc
 While 1
-	; Tìm ảnh mặt cười - khóc để chơi lại game
+    ; Tìm ảnh mặt cười - khóc để chơi lại game
 	Local $Pos = _HandleImgSearch("", @ScriptDir & "\Images\Cuoi.bmp")
 	If @error Then
 		$Pos = _HandleImgSearch("", @ScriptDir & "\Images\Thua.bmp")
 		If @error Then Exit MsgBox(16, "Minesweeperonline Bot Error", "Không xác định được cửa sổ game!")
 	EndIf
 	MouseClick("left", $Pos[1][0], $Pos[1][1], 1, 1)
-
-	; Click ngẫu nhiên khi bắt đầu game
-	For $i = 0 to 4
+    
+    ; Click ngẫu nhiên khi bắt đầu game
+	For $i = 0 to 3
 		_Click(Random(0, $SizeX - 1, 1), Random(0, $SizeY - 1, 1), "left")
-	Next
+    Next
 
-    	; Bắt đầu vòng lặp chính
-	While 1
-		_Flag()
-		If @error Then ExitLoop
+    ; Bắt đầu vòng lặp chính
+    While 1
+        _Flag()
+        If @error Then ExitLoop
+            
+        _Open()
+        If @error Then ExitLoop
+            
+        If $IsBeTac = False Then 
+            $BeTacNum = 0
+        Else
+            $BeTacNum += 1
+        EndIf
 
-		_Open()
-		If @error Then ExitLoop
-
-		If $IsBeTac Then 
-		    $BeTacNum += 1
-		Else
-		    $BeTacNum = 0
-		EndIf
-
-	WEnd
+    WEnd
 	Sleep(100)
 WEnd
 
@@ -178,12 +185,28 @@ Func _ColorToArray()
             $Result[$j][$i] = _ColorSum($i*$SizeX + $SizeX/2, $j*$SizeY + $SizeY/2)
         Next
     Next
-
     Return $Result
 EndFunc
 
 ; Chuyển màu thành kí tự
+; Hỗ trợ tolerance -> tốc độ sẽ chậm lại
 Func _ColorSum($MiddleX, $MiddleY)
+    Local $ColorMiddle = _GlobalGetPixel($MiddleX, $MiddleY)
+    Local $ColorTopLeft = _GlobalGetPixel($MiddleX - $SizeX/2 + 1, $MiddleY - $SizeY/2 + 1)
+    If _Compare($ColorMiddle, $ColorTopLeft, $CW) Then Return "w"
+    If _Compare($ColorMiddle, $ColorTopLeft, $CN) Then Return "n"
+    If _Compare($ColorMiddle, $ColorTopLeft, $CF) Then Return "f"
+    For $i = 1 to 8
+        If _Compare($ColorMiddle, $ColorTopLeft, ($CNum[$i])) Then Return String($i)
+    Next
+    If _Compare($ColorMiddle, $ColorTopLeft, $CB) Then Return "b"
+    If _Compare($ColorMiddle, $ColorTopLeft, $CD) Then Return "d"
+    Return "n"
+EndFunc
+
+; Chuyển màu thành kí tự
+; Tốc độ tối ưu nhất
+Func _ColorSum1($MiddleX, $MiddleY)
     Local $ColorMiddle = _GlobalGetPixel($MiddleX, $MiddleY)
     Local $ColorTopLeft = _GlobalGetPixel($MiddleX - $SizeX/2 + 1, $MiddleY - $SizeY/2 + 1)
     Local $Result = $ColorMiddle + $ColorTopLeft
@@ -192,6 +215,8 @@ Func _ColorSum($MiddleX, $MiddleY)
             $Result = "n" ;none
         Case 29212092
             $Result = "w" ;wall
+        Case 16777215
+            $Result = "f" ;flag
         Case 12435132
             $Result = "1"
         Case 12466365
@@ -204,17 +229,54 @@ Func _ColorSum($MiddleX, $MiddleY)
             $Result = "5"
         Case 12466488
             $Result = "6"
+        Case 00000000
+            $Result = "7"
+        Case 00000000
+            $Result = "8"
         Case 12434877
             $Result = "b" ;boom
         Case 16711680
             $Result = "d" ;die
-        Case 16777215
-            $Result = "f" ;flag
     EndSwitch
+        
     Return $Result; + $ColorBottomRight
 EndFunc
 
 ; Click chuột theo $i, $j
 Func _Click($i, $j, $button = "middle")
     MouseClick($button,  $TopLeft[0] + 2 + $i*$SizeX, $TopLeft[1] + 2 + $j*$SizeY, 1, 0)
+EndFunc
+
+; So sánh màu
+Func _Compare($MidColor, $ConColor, $Array)
+    If not _ColorInBounds($MidColor, $Array[0], 20) Then Return False
+    If _ColorInBounds($ConColor, $Array[1], 20) Then Return True
+    Return False
+EndFunc
+
+; Load toàn bộ ảnh thành pixel
+Func _LoadPixel()
+    For $i = 1 to 8
+        $CNum[$i] = _LoadImgToPixel(@ScriptDir & "\Images\" & $i & ".bmp")
+    Next
+    $CN = _LoadImgToPixel(@ScriptDir & "\Images\none.bmp")
+    $CW = _LoadImgToPixel(@ScriptDir & "\Images\wall.bmp")
+    $CB = _LoadImgToPixel(@ScriptDir & "\Images\boom.bmp")
+    $CD = _LoadImgToPixel(@ScriptDir & "\Images\die.bmp")
+    $CF = _LoadImgToPixel(@ScriptDir & "\Images\flag.bmp")
+EndFunc
+
+; Load pixel từ hình
+Func _LoadImgToPixel($Path)
+    Local $Bitmap = _GDIPlus_BitmapCreateFromFile($Path)
+    Local $Width = _GDIPlus_ImageGetWidth($Bitmap)
+    Local $Height = _GDIPlus_ImageGetHeight($Bitmap)
+
+    Local $Mid = _GDIPlus_BitmapGetPixel($Bitmap, $Width/2, $Height/2)
+    Local $Con = _GDIPlus_BitmapGetPixel($Bitmap, 1, 1)
+    
+    Local $Results[2] = ["0x" & Hex($Mid, 6), "0x" & Hex($Con, 6)]
+
+    _GDIPlus_BitmapDispose($Bitmap)
+    Return $Results
 EndFunc
