@@ -40,32 +40,32 @@ Global $Ar ; Mảng chứa toàn bộ thông tin bãi mìn
 Global $IsBeTac = False ; Khi nào bế tắc với cách giải thông thường thì trả về True
 Global $BeTacNum = 0 ; Số ô phân vân khi có bế tắc
 While 1
-    ; Tìm ảnh mặt cười - khóc để chơi lại game
+	; Tìm ảnh mặt cười - khóc để chơi lại game
 	Local $Pos = _HandleImgSearch("", @ScriptDir & "\Images\Cuoi.bmp")
 	If @error Then
 		$Pos = _HandleImgSearch("", @ScriptDir & "\Images\Thua.bmp")
 		If @error Then Exit MsgBox(16, "Minesweeperonline Bot Error", "Không xác định được cửa sổ game!")
 	EndIf
 	MouseClick("left", $Pos[1][0], $Pos[1][1], 1, 1)
-    
-    ; Click ngẫu nhiên khi bắt đầu game
+
+	; Click ngẫu nhiên khi bắt đầu game
 	For $i = 0 to 4
 		_Click(Random(0, $SizeX - 1, 1), Random(0, $SizeY - 1, 1), "left")
-    Next
+	Next
 
-    ; Bắt đầu vòng lặp chính
+    	; Bắt đầu vòng lặp chính
 	While 1
 		_Flag()
-        If @error Then ExitLoop
-            
+		If @error Then ExitLoop
+
 		_Open()
-        If @error Then ExitLoop
-            
-        If $IsBeTac = False Then 
-            $BeTacNum = 0
-        Else
-            $BeTacNum += 1
-        EndIf
+		If @error Then ExitLoop
+
+		If $IsBeTac Then 
+		    $BeTacNum += 1
+		Else
+		    $BeTacNum = 0
+		EndIf
 
 	WEnd
 	Sleep(100)
