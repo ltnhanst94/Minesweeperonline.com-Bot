@@ -183,7 +183,6 @@ Func _ColorToArray()
 EndFunc
 
 ; Chuyển màu thành kí tự
-; Nếu Màu chưa được khai báo thì hãy mở $Debug = True để hiển thị mảng rồi điền vào Switch Case
 Func _ColorSum($MiddleX, $MiddleY)
     Local $ColorMiddle = _GlobalGetPixel($MiddleX, $MiddleY)
     Local $ColorTopLeft = _GlobalGetPixel($MiddleX - $SizeX/2 + 1, $MiddleY - $SizeY/2 + 1)
