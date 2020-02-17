@@ -4,7 +4,7 @@
 ; Chơi trên web: http://minesweeperonline.com
 ; Zoom: 100%
 
-#Include "HandleImgSearch.au3"
+#Include "..\HandleImgSearch\HandleImgSearch.au3"
 
 HotKeySet("{Esc}", "_Exit")
 Func _Exit()
@@ -34,8 +34,7 @@ Global $NumberX = $Width/$SizeX
 Global $NumberY = $Height/$SizeY
 
 Global $CNum[9]
-Global $CB[2], $CD[2], $CF[2], $CN[2], $CW[2]
-;~ Global $CArray = [$C1, $C2, $C3, $C4, $C5, $C6, $C7, $C8, $CB, $CD, $CF, $CN, $CW]
+Global $CB[2], $CD[2], $CF[2], $CN[2], $CO[2]
 
 ; Load pixel vào mảng
 _LoadPixel()
@@ -47,6 +46,11 @@ Global $Ar ; Mảng chứa toàn bộ thông tin bãi mìn
 Global $IsBeTac = False ; Khi nào bế tắc với cách giải thông thường thì trả về True
 Global $BeTacNum = 0 ; Số ô phân vân khi có bế tắc
 While 1
+    ; Khởi tạo giá trị
+    $Ar = ""
+    $IsBeTac = False
+    $BeTacNum = 0
+
     ; Tìm ảnh mặt cười - khóc để chơi lại game
 	Local $Pos = _HandleImgSearch("", @ScriptDir & "\Images\Cuoi.bmp")
 	If @error Then
@@ -74,6 +78,7 @@ While 1
             $BeTacNum += 1
         EndIf
 
+        Sleep(1)
     WEnd
 	Sleep(100)
 WEnd
@@ -94,27 +99,27 @@ Func _Flag()
             ; Kiểm tra số ô chưa mở xung quanh số đã mở để đặt cờ
             Local $Number = _Convert($Ar[$j][$i])
             If $Number > 0 Then
-                Local $WallCounts = _Count($i, $j, "w")
+                Local $OpenCounts = _Count($i, $j, "o")
                 Local $FlagCounts = _Count($i, $j, "f")
                 
-                If UBound($WallCounts) > 0 and UBound($WallCounts) = $Number - UBound($FlagCounts) + $BeTacNum Then
+                If UBound($OpenCounts) > 0 and UBound($OpenCounts) = $Number - UBound($FlagCounts) + $BeTacNum Then
                     
                     ; Nếu có bế tắc sẽ click đặt cờ ngẫu nhiên vào 1 trong các ô chưa mở
                     ; Có thể đặt các patterns đặc biệt để xử lý ở đây
                     If $BeTacNum > 0 Then
-                        Local $k = Random(0, UBound($WallCounts) - 1, 1)
-                        _Click($WallCounts[$k][0], $WallCounts[$k][1], "right")
+                        Local $k = Random(0, UBound($OpenCounts) - 1, 1)
+                        _Click($OpenCounts[$k][0], $OpenCounts[$k][1], "right")
                         $IsBeTac = True
                         ; Vì chỉ là dự đoán nên sẽ thoát vòng lặp ngay khi đặt được cờ
                         Return 
                     EndIf
                     
                     ; Nếu an toàn sẽ click đặt cờ vào tất cả các ô chưa mở
-                    For $k = 0 to UBound($WallCounts) - 1
-                        _Click($WallCounts[$k][0], $WallCounts[$k][1], "right")
+                    For $k = 0 to UBound($OpenCounts) - 1
+                        _Click($OpenCounts[$k][0], $OpenCounts[$k][1], "right")
 
                         ; Tận dụng 1 lần chạy vòng lặp để đặt nhiều cờ nhất có thể
-                        $Ar[$WallCounts[$k][1]][$WallCounts[$k][0]] = "f"
+                        $Ar[$OpenCounts[$k][1]][$OpenCounts[$k][0]] = "f"
                     Next
 
                     $IsBeTac = False
@@ -128,9 +133,6 @@ EndFunc
 
 ; Function mở tất các các ô đủ cờ bao quanh nó
 Func _Open()
-    $Ar = _ColorToArray()
-	If @error Then Return SetError(1, 0, False)
-
     For $j = 0 to $NumberY - 1
         For $i = 0 to $NumberX - 1
 
@@ -141,7 +143,7 @@ Func _Open()
 
             ; Kiểm tra xung quanh số đã đủ cờ và còn ô chưa mở => click
             Local $Number = _Convert($Ar[$j][$i])
-            If $Number > 0 and Ubound(_Count($i, $j, "f")) == $Number and Ubound(_Count($i, $j, "w")) > 0 Then
+            If $Number > 0 and Ubound(_Count($i, $j, "f")) == $Number and Ubound(_Count($i, $j, "o")) > 0 Then
                 _Click($i, $j, "middle")
                 $IsBeTac = False
             EndIf
@@ -154,7 +156,7 @@ Func _Count($x, $y, $flag)
     Dim $Results[0][2]
     For $j = ($y > 0 ? -1 : 0) to ($y < $NumberY - 1 ? 1 : 0)
         For $i = ($x > 0 ? -1 : 0) to  ($x < $NumberX - 1 ? 1 : 0)
-            If $Ar[$y + $j][$x + $i] == $flag Then
+            If $Ar[$y + $j][$x + $i] == $flag or ($flag = "num" and _Convert($flag) > 0) Then
                 Redim $Results[UBound($Results) + 1][2]
                 $Results[UBound($Results) - 1][0]  = $x + $i
                 $Results[UBound($Results) - 1][1]  = $y + $j
@@ -178,11 +180,22 @@ EndFunc
 Func _ColorToArray()
     Local $Result[$NumberY][$NumberX]
     _GlobalImgCapture()
-    If @error Then Exit MsgBox(16, "Minesweeperonline bot error", "Không chụp được ảnh màn hình!")
+    If @error Then Exit MsgBox(16, "Minesweeperonline Bot Error", "Không chụp được ảnh màn hình!")
 
     For $j = 0 to $NumberY - 1
         For $i = 0 to $NumberX - 1
-            $Result[$j][$i] = _ColorSum($i*$SizeX + $SizeX/2, $j*$SizeY + $SizeY/2)
+            If IsArray($Ar) Then
+                ; Chỉ lấy lại pixel khi ô đang duyệt chưa mở
+                If $Ar[$j][$i] = "o" Then
+                    $Result[$j][$i] = _ColorSum($i*$SizeX + $SizeX/2, $j*$SizeY + $SizeY/2)
+                Else
+                    $Result[$j][$i] = $Ar[$j][$i]
+                EndIf
+            Else
+                ; Nếu là lần duyệt đầu tiên sẽ duyệt lại toàn bộ ô
+                ; Sẽ hỗ trợ tìm vị trí có thể mở được cho những phiên bản sau
+                $Result[$j][$i] = _ColorSum($i*$SizeX + $SizeX/2, $j*$SizeY + $SizeY/2)
+            EndIf
         Next
     Next
     Return $Result
@@ -190,10 +203,10 @@ EndFunc
 
 ; Chuyển màu thành kí tự
 ; Hỗ trợ tolerance -> tốc độ sẽ chậm lại
-Func _ColorSum($MiddleX, $MiddleY)
+Func _ColorSum1($MiddleX, $MiddleY)
     Local $ColorMiddle = _GlobalGetPixel($MiddleX, $MiddleY)
     Local $ColorTopLeft = _GlobalGetPixel($MiddleX - $SizeX/2 + 1, $MiddleY - $SizeY/2 + 1)
-    If _Compare($ColorMiddle, $ColorTopLeft, $CW) Then Return "w"
+    If _Compare($ColorMiddle, $ColorTopLeft, $CO) Then Return "o"
     If _Compare($ColorMiddle, $ColorTopLeft, $CN) Then Return "n"
     If _Compare($ColorMiddle, $ColorTopLeft, $CF) Then Return "f"
     For $i = 1 to 8
@@ -206,7 +219,7 @@ EndFunc
 
 ; Chuyển màu thành kí tự
 ; Tốc độ tối ưu nhất
-Func _ColorSum1($MiddleX, $MiddleY)
+Func _ColorSum($MiddleX, $MiddleY)
     Local $ColorMiddle = _GlobalGetPixel($MiddleX, $MiddleY)
     Local $ColorTopLeft = _GlobalGetPixel($MiddleX - $SizeX/2 + 1, $MiddleY - $SizeY/2 + 1)
     Local $Result = $ColorMiddle + $ColorTopLeft
@@ -214,7 +227,7 @@ Func _ColorSum1($MiddleX, $MiddleY)
         Case 24869754
             $Result = "n" ;none
         Case 29212092
-            $Result = "w" ;wall
+            $Result = "o" ;open
         Case 16777215
             $Result = "f" ;flag
         Case 12435132
@@ -229,10 +242,10 @@ Func _ColorSum1($MiddleX, $MiddleY)
             $Result = "5"
         Case 12466488
             $Result = "6"
-        Case 00000000
-            $Result = "7"
-        Case 00000000
-            $Result = "8"
+        ;~ Case 00000000
+        ;~     $Result = "7"
+        ;~ Case 00000000
+        ;~     $Result = "8"
         Case 12434877
             $Result = "b" ;boom
         Case 16711680
@@ -260,7 +273,7 @@ Func _LoadPixel()
         $CNum[$i] = _LoadImgToPixel(@ScriptDir & "\Images\" & $i & ".bmp")
     Next
     $CN = _LoadImgToPixel(@ScriptDir & "\Images\none.bmp")
-    $CW = _LoadImgToPixel(@ScriptDir & "\Images\wall.bmp")
+    $CO = _LoadImgToPixel(@ScriptDir & "\Images\open.bmp")
     $CB = _LoadImgToPixel(@ScriptDir & "\Images\boom.bmp")
     $CD = _LoadImgToPixel(@ScriptDir & "\Images\die.bmp")
     $CF = _LoadImgToPixel(@ScriptDir & "\Images\flag.bmp")
